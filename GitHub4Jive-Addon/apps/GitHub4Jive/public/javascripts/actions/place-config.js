@@ -2,23 +2,26 @@ var app = {
 
   currentView : gadgets.views.getCurrentView().getName(),
   currentViewerID : -1,
+  currentPlaceID : {},
+  
   initGadget : function() {
         console.log('initGadget ...');
+        var appObj = this;
     
-//         gadgets.actions.updateAction({
-//                 id:"com.jivesoftware.addon.github4jive.group.config",
-//                 callback: handleContext
-//         });
+        gadgets.actions.updateAction({
+                id:"com.jivesoftware.addon.github4jive.group.config",
+                callback: appObj.handleContext
+        });
     
-//         gadgets.actions.updateAction({
-//                 id:"com.jivesoftware.addon.github4jive.project.config",
-//                 callback: handleContext
-//         });
+        gadgets.actions.updateAction({
+                id:"com.jivesoftware.addon.github4jive.project.config",
+                callback: appObj.handleContext
+        });
     
-//         gadgets.actions.updateAction({
-//                 id:"com.jivesoftware.addon.github4jive.space.config",
-//                 callback: handleContext
-//         });
+        gadgets.actions.updateAction({
+                id:"com.jivesoftware.addon.github4jive.space.config",
+                callback: appObj.handleContext
+        });
 
 
       console.log('getViewer test ...');
@@ -33,6 +36,7 @@ var app = {
   
   initjQuery : function() {
     console.log('initjQuery ...');
+    var appObj = this;
     
     $('#github4jive-github-authorize').click(function() {
 
@@ -40,7 +44,7 @@ var app = {
         var BACKEND_HOST = "http://speedy-thunder-87-131578.use1-2.nitrousbox.com:8090";
 
         osapi.http.get({
-          href: BACKEND_HOST+'/github/oauth/authorize?viewerID='+app.currentViewerID,
+          href: BACKEND_HOST+'/github/oauth/authorize?viewerID='+encodeURIComponent(appObj.currentViewerID)+"&placeID="+encodeURIComponent('appObj.currentPlaceID'),
           format: 'json',
           headers: {"Content-Type":["application/json"]},
           noCache: true,
@@ -56,37 +60,44 @@ var app = {
   },
   
   handleContext : function(context) {
-      console.log('handleContext ...');
+    console.log('handleContext ...',context);
+    var appObj = this;
     
-      if(context && context.jive){
+    if (context && context.jive) {
 
-                osapi.jive.corev3.resolveContext(context, function(result){
-                        result.content.getExtProps().execute(function( props ) {
-                              if ("true" ===  props.content.github4jiveEnabled) {
-                                console.log('initializing UI for already configured place');
-                              } else {
-                                console.log('initializing UI for UNconfigured place');
-                              }
-                        });
-                });
-                console.log('gadget:'+$("#github4jive-enable-submit").size());
-                $("#github4jive-enable-submit").click(function() {
-                        console.log('clicked');
-                        osapi.jive.corev3.resolveContext(context, function(result){
-                                console.log('resolveContext callback');
-                                if(result.content){
-                                        console.log('context has content callback');
-                                        //TODO: BULLET-PROOF/UN HARD CODE THE LOGIC HERE, REVISIT ONCE THE FLOW IS BETTER BAKED - RR
-                                        result.content.createExtProps({
-                                                "github4jiveEnabled": true,
-                                                "github4jiveAccessToken": $("#github-authorize-token").val()
-                                        }).execute(function (resp) {
-                                                console.log('resp: {'+JSON.stringify(resp)+'}');
-                                                osapi.jive.core.container.closeApp();
-                                        });
-                                }
-                        });
-                }); 
+      osapi.jive.corev3.resolveContext(context, function(result) {
+        console.log(result);
+        /*** STORE CURRENT PLACE ***/
+        appObj.currentPlaceID = result.resources['self'].ref;
+                    
+        /*** CHECK EXTENDED PROPERTIES ***/
+        result.content.getExtProps().execute(function( props ) {
+          if ("true" ===  props.content.github4jiveEnabled) {
+            console.log('initializing UI for already configured place');
+          } else {
+            console.log('initializing UI for UNconfigured place');
+          }
+        });
+      });
+      
+      console.log('gadget:'+$("#github4jive-enable-submit").size());
+      $("#github4jive-enable-submit").click(function() {
+        console.log('clicked');
+        osapi.jive.corev3.resolveContext(context, function(result){
+          console.log('resolveContext callback');
+          if(result.content){
+            console.log('context has content callback');
+            //TODO: BULLET-PROOF/UN HARD CODE THE LOGIC HERE, REVISIT ONCE THE FLOW IS BETTER BAKED - RR
+            result.content.createExtProps({
+              "github4jiveEnabled": true,
+              "github4jiveAccessToken": $("#github-authorize-token").val()
+            }).execute(function (resp) {
+              console.log('resp: {'+JSON.stringify(resp)+'}');
+              osapi.jive.core.container.closeApp();
+            });
+          }
+        });
+      }); 
         }
   },
   
