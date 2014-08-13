@@ -30,6 +30,79 @@ myOauth.fetchOAuth2Conf = function() {
 };
 
 
+
+/**
+ * <h5>Route:</h5>
+ * <i>GET /authorizeUrl</i>
+ * <br><br>
+ * Expects:
+ * - viewerID
+ * - callback
+ * - base64 encoded Authorization header
+ * - Added Support for placeID parameter to persist into State
+ * @param req
+ * @param res
+ */
+myOauth.authorizeUrl = function(req, res ) {
+    var url_parts = url.parse(req.url, true);
+    var query = url_parts.query;
+
+    var viewerID = query['viewerID'];
+    var placeID = query['placeID'];
+    var callback = query['callback'];
+    var targetJiveTargetID = query['jiveTenantID'];
+    var jiveExtensionHeaders = jive.util.request.parseJiveExtensionHeaders(req);
+    if (jiveExtensionHeaders ) {
+        var originJiveTenantID = jiveExtensionHeaders['tenantID'];
+        jive.logger.debug('Origin jive tenantID', originJiveTenantID);
+    }
+
+    var contextStr = query['context'];
+    if ( contextStr ) {
+        try {
+            var context = JSON.parse( decodeURI(contextStr) );
+        } catch (e) {
+            errorResponse( res, 400, 'Invalid context string, could not parse');
+            return;
+        }
+    }
+
+    // encode the target jiveTenantID in the context
+    if ( targetJiveTargetID ) {
+        context = context || {};
+        context = { 'jiveTenantID' : targetJiveTargetID };
+    }
+
+    // encode the origin jiveTenantID in the context
+    if ( originJiveTenantID ) {
+        context = context || {};
+        context['originJiveTenantID'] = originJiveTenantID;
+    }
+
+    var extraAuthParamsStr = query['extraAuthParams'];
+    if ( extraAuthParamsStr ) {
+        try {
+            var extraAuthParams = JSON.parse( decodeURI(extraAuthParamsStr ));
+        } catch (e) {
+            errorResponse( res, 400, 'Invalid extra auth param string, could not parse');
+            return;
+        }
+    }
+  
+    var responseMap = myOauth.buildAuthorizeUrlResponseMap(
+      myOauth.fetchOAuth2Conf(), 
+      callback, 
+      { 'viewerID': viewerID, 'placeID' : placeID, 'context': context}, 
+      extraAuthParams 
+    );
+
+    jive.logger.debug('Sending', responseMap);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+
+  res.end( JSON.stringify(responseMap) );
+};
+
+
 myOauth.oauth2SuccessCallback = function( state, originServerAccessTokenResponse, callback ) {
     jive.logger.debug("oauth2SuccessCallback ...");
     jive.logger.debug('State', state);
@@ -38,11 +111,12 @@ myOauth.oauth2SuccessCallback = function( state, originServerAccessTokenResponse
     state = JSON.parse(state);
   
     var context = {
+      placeID : state['placeID'],
       userID : state['viewerID'],
       token: originServerAccessTokenResponse['entity']
     };
   
-    tokenStore.save('gitHubAccessTokens', state['viewerID'], context).then( function() {
+    tokenStore.save('gitHubAccessTokens', state['placeID'], context).then( function() {
         callback(context);
     });
 };
