@@ -1,10 +1,19 @@
 var app = {
   currentView : gadgets.views.getCurrentView().getName(),
 
+  currentViewer : {},
+  
+  currentPlace : {},
+
   initGadget : function() {
     console.log('initGadget called...');
+    var appObj = this;
+    
+    //*** LOAD THE CURRENT CONTAINER ***
         
     jive.tile.onOpen(function(config, options ) {
+        console.log('onOpen called',config,options);
+      
         gadgets.window.adjustHeight();
 
         if ( typeof config === "string" ) {
@@ -29,6 +38,37 @@ var app = {
   
   initjQuery : function(host) {
     console.log('initjQuery called: ',host);
+    var appObj = this;
+    
+    /*** LOAD THE CURRENT USER ***/
+    osapi.jive.corev3.people.getViewer().execute( function(user) {
+        console.log('getViewer returned',user);
+        appObj.currentViewer = user.resources.self.ref;
+
+        /*** LOAD THE CURRENT CONTAINER ***/
+        jive.tile.getContainer(function(container) {
+          console.log('getContainer returned',container);
+          appObj.currentPlace = container.resources.self.ref;
+          $('#github4jive-github-authorize').slideDown('fast',function() {
+            appObj.launchOAuth2ServerFlow(host);
+          });
+        });
+    });
+    
+    $("#btn_done").click( function() {
+        console.log(onLoadContext);
+    });
+    
+  },
+  
+  launchOAuth2ServerFlow : function(host) {
+    var appObj = this;
+    
+    console.log('launchOAuth2ServerFlow called ...',host);
+    
+    var authorizeUrl = host + '/github/oauth/authorize?viewerID='+encodeURIComponent(appObj.currentViewer)+"&placeID="+encodeURIComponent(appObj.currentPlace);
+    
+    console.log(authorizeUrl);
     
     var options = {
         serviceHost : host,
@@ -37,15 +77,10 @@ var app = {
         oauth2SuccessCallback : app.oauth2SuccessCallback,
         preOauth2DanceCallback : app.preOauth2DanceCallback,
         onLoadCallback : app.onLoadCallback,
-        authorizeUrl : host + '/github/oauth/authorize'
+        authorizeUrl : authorizeUrl
     };
     
-    $("#btn_done").click( function() {
-        console.log(onLoadContext);
-    });
-    
     OAuth2ServerFlow( options ).launch();
-    
   },
   
   tokenErrorCallback : function() {
